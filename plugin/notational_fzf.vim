@@ -168,6 +168,37 @@ endfunction
 
 let s:nv_ignore_pattern = exists('g:nv_ignore_pattern') ? s:ignore_list_to_str(g:nv_ignore_pattern) : ''
 
+"============================== Source Builder ==============================
+
+function! s:build_source(args) abort
+    let l:rg_content = join([
+        \ s:command, 'rg', '--follow', s:use_ignore_files, '--smart-case',
+        \ s:include_hidden, '--line-number', '--color never', '--no-messages',
+        \ s:nv_ignore_pattern, '--no-heading', '--with-filename',
+        \ ((a:args is '') ? '"\S"' : shellescape(a:args)),
+        \ s:search_path_str,
+        \ ])
+
+    if !get(g:, 'nv_include_filenames', 1)
+        return l:rg_content . s:format_path_expr . ' 2>' . s:null_path
+    endif
+
+    let l:fname_cmd = join([
+        \ s:command, 'rg --files', '--follow',
+        \ s:use_ignore_files, s:include_hidden,
+        \ s:nv_ignore_pattern, s:search_path_str,
+        \ ])
+
+    if a:args isnot ''
+        let l:fname_cmd .= ' | grep -i ' . shellescape(a:args)
+    endif
+
+    let l:fname_cmd .= " | awk -F/ '{printf \"%s:0:\\033[33m[fname]\\033[0m %s\\n\", $0, $NF}'"
+
+    return '{ ' . l:fname_cmd . ' ; ' . l:rg_content . ' ; }'
+        \ . s:format_path_expr . ' 2>' . s:null_path
+endfunction
+
 "============================== Handler Function ===========================
 
 function! s:handler(lines) abort
@@ -242,26 +273,7 @@ command! -nargs=* -bang NV
           \ fzf#wrap({
               \ 'sink*': function(exists('*NV_note_handler') ? 'NV_note_handler' : '<sid>handler'),
               \ 'window': s:window_command,
-              \ 'source': join([
-                   \ s:command,
-                   \ 'rg',
-                   \ '--follow',
-                   \ s:use_ignore_files,
-                   \ '--smart-case',
-                   \ s:include_hidden,
-                   \ '--line-number',
-                   \ '--color never',
-                   \ '--no-messages',
-                   \ s:nv_ignore_pattern,
-                   \ '--no-heading',
-                   \ '--with-filename',
-                   \ ((<q-args> is '') ?
-                     \ '"\S"' :
-                     \ shellescape(<q-args>)),
-                   \ s:search_path_str,
-                   \ s:format_path_expr,
-                   \ '2>' . s:null_path,
-                   \ ]),
+              \ 'source': s:build_source(<q-args>),
               \ s:window_direction: s:window_width,
               \ 'options': join([
                                \ '--print-query',

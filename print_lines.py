@@ -84,6 +84,9 @@ def main() -> None:
         print(f"Error: Invalid argument: {e}", file=sys.stderr)
         sys.exit(1)
 
+    if target_line == 0:
+        target_line = 1
+
     if not preview_with_bat(filepath, target_line, height):
         preview_with_fallback(filepath, target_line, height)
 
